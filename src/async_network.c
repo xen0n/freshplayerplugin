@@ -51,6 +51,45 @@ static pthread_mutex_t    lock;
 
 static const struct timeval connect_timeout = { .tv_sec =  60, .tv_usec = 0 };
 
+// douyu
+static const int32_t DOUYU_PACKET_HEADER_SIZE = 12;
+static const int32_t DOUYU_CLIENT_MAGIC = 0x2b1;
+static const int32_t DOUYU_SERVER_MAGIC = 0x2b2;
+
+static
+int32_t
+is_probably_douyu_packet(const char *buf, int32_t len, bool client)
+{
+	if (len < DOUYU_PACKET_HEADER_SIZE) {
+		return 0;
+	}
+
+	int32_t *int32_buf = (void *)buf;
+	int32_t len_a = int32_buf[0];
+	int32_t len_b = int32_buf[1];
+	int32_t magic = int32_buf[2];
+	int32_t expected_magic = client ? DOUYU_CLIENT_MAGIC : DOUYU_SERVER_MAGIC;
+
+	if (len_a != len_b || magic != expected_magic) {
+		return 0;
+	}
+
+	// ;-)
+	return expected_magic;
+}
+
+static
+void
+process_douyu_packet(const char *buf, int32_t len, int32_t type_magic)
+{
+	if (type_magic == DOUYU_CLIENT_MAGIC) {
+		trace_info("~~~ Douyu > %s\n", buf + DOUYU_PACKET_HEADER_SIZE);
+		return;
+	}
+
+	trace_info("~~~ Douyu < %s\n", buf + DOUYU_PACKET_HEADER_SIZE);
+}
+
 static
 void
 __attribute__((constructor))
@@ -328,6 +367,12 @@ handle_tcp_read_stage2(int sock, short event_flags, void *arg)
         }
     }
 
+	// douyu server message?
+	int32_t douyu_magic = is_probably_douyu_packet(task->buffer, retval, false);
+	if (douyu_magic) {
+		process_douyu_packet(task->buffer, retval, douyu_magic);
+	}
+
     ppb_message_loop_post_work_with_result(task->callback_ml, task->callback, 0, retval, 0,
                                            __func__);
     task_destroy(task);
@@ -375,6 +420,12 @@ handle_tcp_write_stage1(struct async_network_task_s *task)
         task_destroy(task);
         return;
     }
+
+	// douyu client message?
+	int32_t douyu_magic = is_probably_douyu_packet(task->buffer, task->bufsize, true);
+	if (douyu_magic) {
+		process_douyu_packet(task->buffer, task->bufsize, douyu_magic);
+	}
 
     struct event *ev = event_new(event_b, ts->sock, EV_WRITE, handle_tcp_write_stage2, task);
     pp_resource_release(task->resource);
