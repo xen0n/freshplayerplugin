@@ -1,14 +1,18 @@
 #include "douyu.h"
 #include <stdlib.h>
+#include <hiredis/hiredis.h>
+#include <hiredis/async.h>
+#include <hiredis/adapters/libevent.h>
 #include "trace.h"
 
 static bool configured = false;
+static redisAsyncContext *ctx = NULL;
 static const char *redis_host;
 static unsigned short redis_port;
 
 
 void
-douyu_init(void)
+douyu_init(struct event_base *base)
 {
     const char *tmp;
 
@@ -28,7 +32,17 @@ douyu_init(void)
         redis_port = 6379;
     }
 
-    trace_info("Douyu Redis side channel enabled: %s:%hu\n", redis_host, redis_port);
+    trace_info("Douyu Redis side channel configured: %s:%hu\n", redis_host, redis_port);
+
+    ctx = redisAsyncConnect(redis_host, redis_port);
+    if (ctx->err) {
+        trace_error("Douyu Redis side channel failed to initialize: %s\n", ctx->errstr);
+        return;
+    }
+
+    redisLibeventAttach(ctx, base);
+    trace_info("Douyu Redis side channel initialized!\n");
+
     configured = true;
 }
 

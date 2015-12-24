@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <event2/event.h>
 
 #define DOUYU_CLIENT_MAGIC 0x2b1
 #define DOUYU_SERVER_MAGIC 0x2b2
@@ -22,7 +23,7 @@ typedef struct {
 
 
 void
-douyu_init(void);
+douyu_init(struct event_base *base);
 
 
 void
