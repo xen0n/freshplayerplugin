@@ -650,6 +650,10 @@ async_network_task_push(struct async_network_task_s *task)
         pthread_create(&t, NULL, network_worker_thread, NULL);
         pthread_detach(t);
         thread_started = 1;
+
+#if HAVE_DOUYU
+        douyu_init();
+#endif
     }
 
     switch (task->type) {

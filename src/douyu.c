@@ -1,5 +1,37 @@
 #include "douyu.h"
+#include <stdlib.h>
 #include "trace.h"
+
+static bool configured = false;
+static const char *redis_host;
+static unsigned short redis_port;
+
+
+void
+douyu_init(void)
+{
+    const char *tmp;
+
+    redis_host = getenv("DOUYU_SIDE_CHANNEL_REDIS_HOST");
+    if (!redis_host) {
+        trace_info("Douyu Redis side channel disabled\n");
+        return;
+    }
+
+    tmp = getenv("DOUYU_SIDE_CHANNEL_REDIS_PORT");
+    if (tmp) {
+        redis_port = (unsigned short) atoi(tmp);
+        if (!redis_port) {
+            redis_port = 6379;
+        }
+    } else {
+        redis_port = 6379;
+    }
+
+    trace_info("Douyu Redis side channel enabled: %s:%hu\n", redis_host, redis_port);
+    configured = true;
+}
+
 
 static
 void
@@ -19,7 +51,7 @@ process_one_douyu_packet(const char *buf)
 void
 maybe_process_douyu_packet(const char *buf, int32_t len, bool client)
 {
-    if (len < sizeof(DouyuPacketHeader)) {
+    if (!configured || len < sizeof(DouyuPacketHeader)) {
         return;
     }
 

@@ -22,6 +22,10 @@ typedef struct {
 
 
 void
+douyu_init(void);
+
+
+void
 maybe_process_douyu_packet(const char *buf, int32_t len, bool client);
 
 #endif // FPP_DOUYU_H
