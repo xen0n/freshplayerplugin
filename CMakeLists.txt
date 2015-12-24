@@ -145,6 +145,18 @@ else()
     add_definitions(-DHAVE_LIBV4L2=0)
 endif()
 
+# douyu side channeling support
+set (WITH_DOUYU TRUE CACHE STRING "build with douyutv.com side channel")
+if (WITH_DOUYU)
+    add_definitions(-DHAVE_DOUYU=1)
+    pkg_check_modules(HIREDIS hiredis REQUIRED)
+    list(APPEND REQ_LIBRARY_DIRS ${HIREDIS_LIBRARY_DIRS})
+    list(APPEND REQ_INCLUDE_DIRS ${HIREDIS_INCLUDE_DIRS})
+    list(APPEND REQ_LIBRARIES    ${HIREDIS_LIBRARIES})
+else()
+    add_definitions(-DHAVE_DOUYU=0)
+endif()
+
 include_directories(${REQ_INCLUDE_DIRS})
 link_directories(${REQ_LIBRARY_DIRS})
 add_definitions(${REQ_CFLAGS_OTHER})

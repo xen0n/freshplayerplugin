@@ -43,6 +43,10 @@
 #include "config.h"
 #include "ppb_message_loop.h"
 
+#if HAVE_DOUYU
+#include "douyu.h"
+#endif
+
 
 static struct event_base *event_b = NULL;
 static struct evdns_base *evdns_b = NULL;
@@ -50,65 +54,6 @@ static GHashTable        *tasks_ht = NULL;
 static pthread_mutex_t    lock;
 
 static const struct timeval connect_timeout = { .tv_sec =  60, .tv_usec = 0 };
-
-// douyu
-static const int32_t DOUYU_CLIENT_MAGIC = 0x2b1;
-static const int32_t DOUYU_SERVER_MAGIC = 0x2b2;
-
-typedef struct {
-	int32_t next;
-	int32_t next_2;
-	int32_t magic;
-} DouyuPacketHeader;
-
-typedef struct {
-	DouyuPacketHeader hdr;
-	char buf[];
-} DouyuPacket;
-
-static
-void
-process_one_douyu_packet(const char *buf)
-{
-	DouyuPacket *pkt = (DouyuPacket *)buf;
-
-	if (pkt->hdr.magic == DOUYU_CLIENT_MAGIC) {
-		trace_info("~~~ Douyu > %s\n", pkt->buf);
-		return;
-	}
-
-	trace_info("~~~ Douyu < %s\n", pkt->buf);
-}
-
-static
-void
-maybe_process_douyu_packet(const char *buf, int32_t len, bool client)
-{
-	if (len < sizeof(DouyuPacketHeader)) {
-		return;
-	}
-
-	int32_t expected_magic = client ? DOUYU_CLIENT_MAGIC : DOUYU_SERVER_MAGIC;
-
-	// ;-)
-	// actually there maybe more than one packets
-	const char *ptr = buf;
-	while (len > 0) {
-		DouyuPacketHeader *hdr = (DouyuPacketHeader *)ptr;
-
-		if (hdr->next != hdr->next_2 || hdr->magic != expected_magic) {
-			// this packet is malformed
-			return;
-		}
-
-		// douyu packets are just zero-terminated funky-encoded clear text
-		process_one_douyu_packet(ptr);
-
-		int packet_len = hdr->next + 4;
-		ptr += packet_len;
-		len -= packet_len;
-	}
-}
 
 static
 void
@@ -387,8 +332,10 @@ handle_tcp_read_stage2(int sock, short event_flags, void *arg)
         }
     }
 
-	// douyu server message?
-	maybe_process_douyu_packet(task->buffer, retval, false);
+#if HAVE_DOUYU
+    // douyu server message?
+    maybe_process_douyu_packet(task->buffer, retval, false);
+#endif
 
     ppb_message_loop_post_work_with_result(task->callback_ml, task->callback, 0, retval, 0,
                                            __func__);
@@ -438,8 +385,10 @@ handle_tcp_write_stage1(struct async_network_task_s *task)
         return;
     }
 
-	// douyu client message?
-	maybe_process_douyu_packet(task->buffer, task->bufsize, true);
+#if HAVE_DOUYU
+    // douyu client message?
+    maybe_process_douyu_packet(task->buffer, task->bufsize, true);
+#endif
 
     struct event *ev = event_new(event_b, ts->sock, EV_WRITE, handle_tcp_write_stage2, task);
     pp_resource_release(task->resource);

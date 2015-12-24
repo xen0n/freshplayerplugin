@@ -105,6 +105,10 @@ else()
     add_definitions(-DHAVE_HWDEC=0)
 endif()
 
+if (HIREDIS_FOUND AND WITH_DOUYU)
+    list(APPEND source_list douyu.c)
+endif()
+
 add_executable(link_check link_check.c)
 target_link_libraries(link_check ${REQ_LIBRARIES})
 
