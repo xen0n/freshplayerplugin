@@ -49,16 +49,22 @@ douyu_init(struct event_base *base)
 
 static
 void
-process_one_douyu_packet(const char *buf)
+process_one_douyu_packet(const char *buf, int32_t len)
 {
     DouyuPacket *pkt = (DouyuPacket *)buf;
 
-    if (pkt->hdr.magic == DOUYU_CLIENT_MAGIC) {
-        trace_info("~~~ Douyu > %s\n", pkt->buf);
-        return;
+    int err = redisAsyncCommand(
+            ctx,
+            NULL,
+            NULL,
+            "PUBLISH %s %b",
+            pkt->hdr.magic == DOUYU_CLIENT_MAGIC ? "douyu-client" : "douyu-server",
+            pkt->buf,
+            len
+            );
+    if (err != REDIS_OK) {
+        trace_warning("Douyu: publish to Redis failed!\n");
     }
-
-    trace_info("~~~ Douyu < %s\n", pkt->buf);
 }
 
 
@@ -83,9 +89,9 @@ maybe_process_douyu_packet(const char *buf, int32_t len, bool client)
         }
 
         // douyu packets are just zero-terminated funky-encoded clear text
-        process_one_douyu_packet(ptr);
+        int32_t packet_len = hdr->next + 4;
+        process_one_douyu_packet(ptr, packet_len);
 
-        int packet_len = hdr->next + 4;
         ptr += packet_len;
         len -= packet_len;
     }
