@@ -1,5 +1,6 @@
 #include "douyu.h"
 #include <stdlib.h>
+#include <string.h>
 #include <hiredis/hiredis.h>
 #include <hiredis/async.h>
 #include <hiredis/adapters/libevent.h>
@@ -49,7 +50,7 @@ douyu_init(struct event_base *base)
 
 static
 void
-process_one_douyu_packet(const char *buf, int32_t len)
+process_one_douyu_packet(const char *buf)
 {
     DouyuPacket *pkt = (DouyuPacket *)buf;
 
@@ -60,7 +61,7 @@ process_one_douyu_packet(const char *buf, int32_t len)
             "PUBLISH %s %b",
             pkt->hdr.magic == DOUYU_CLIENT_MAGIC ? "douyu-client" : "douyu-server",
             pkt->buf,
-            len
+            strlen(pkt->buf)
             );
     if (err != REDIS_OK) {
         trace_warning("Douyu: publish to Redis failed!\n");
@@ -89,8 +90,11 @@ maybe_process_douyu_packet(const char *buf, int32_t len, bool client)
         }
 
         // douyu packets are just zero-terminated funky-encoded clear text
+        // it seems packet_len itself may be incorrect as very large numbers of
+        // packets have trailing excess data... meaning it can only be used for
+        // framing.
         int32_t packet_len = hdr->next + 4;
-        process_one_douyu_packet(ptr, packet_len);
+        process_one_douyu_packet(ptr);
 
         ptr += packet_len;
         len -= packet_len;
