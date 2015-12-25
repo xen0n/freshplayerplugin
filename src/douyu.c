@@ -58,8 +58,9 @@ process_one_douyu_packet(const char *buf)
             ctx,
             NULL,
             NULL,
-            "PUBLISH %s %b",
-            pkt->hdr.magic == DOUYU_CLIENT_MAGIC ? "douyu-client" : "douyu-server",
+            "PUBLISH %s %s%b",
+            "douyu",
+            pkt->hdr.magic == DOUYU_CLIENT_MAGIC ? "> " : "< ",
             pkt->buf,
             strlen(pkt->buf)
             );
