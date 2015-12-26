@@ -23,6 +23,14 @@ typedef struct {
 } DouyuPacket;
 
 
+bool
+is_douyu_enabled(void);
+
+
+bool
+is_douyu_scraping(void);
+
+
 void
 douyu_init(struct event_base *base);
 

@@ -18,11 +18,51 @@ struct PP_Var clientCallbackFunctionName;
 struct PP_Var serverCallbackFunctionName;
 
 
+bool
+is_douyu_enabled(void)
+{
+    const char *s = getenv("DOUYU_SIDE_CHANNEL");
+    int v;
+
+    if (!s) {
+        return false;
+    }
+
+    v = atoi(s);
+    return !!v;
+}
+
+
+bool
+is_douyu_scraping(void)
+{
+    const char *s = getenv("DOUYU_IS_SCRAPING");
+    int v;
+
+    if (!s) {
+        return false;
+    }
+
+    v = atoi(s);
+    return !!v;
+}
+
+
 void
 douyu_init(struct event_base *base)
 {
     const char *tmp;
 
+    if (!is_douyu_enabled()) {
+        trace_info("Douyu side channel disabled");
+        return;
+    }
+
+    clientCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgC");
+    serverCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgS");
+    configured = true;
+
+    // redis side channel
     redis_host = getenv("DOUYU_SIDE_CHANNEL_REDIS_HOST");
     if (!redis_host) {
         trace_info("Douyu Redis side channel disabled\n");
@@ -49,11 +89,6 @@ douyu_init(struct event_base *base)
 
     redisLibeventAttach(ctx, base);
     trace_info("Douyu Redis side channel initialized!\n");
-
-    clientCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgC");
-    serverCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgS");
-
-    configured = true;
 }
 
 
@@ -111,18 +146,20 @@ process_one_douyu_packet(PP_Instance instance, const char *buf)
     DouyuPacket *pkt = (DouyuPacket *)buf;
     bool client = pkt->hdr.magic == DOUYU_CLIENT_MAGIC;
 
-    int err = redisAsyncCommand(
-            ctx,
-            NULL,
-            NULL,
-            "PUBLISH %s %s%b",
-            "douyu",
-            client ? "> " : "< ",
-            pkt->buf,
-            strlen(pkt->buf)
-            );
-    if (err != REDIS_OK) {
-        trace_warning("Douyu: publish to Redis failed!\n");
+    if (ctx) {
+        int err = redisAsyncCommand(
+                ctx,
+                NULL,
+                NULL,
+                "PUBLISH %s %s%b",
+                "douyu",
+                client ? "> " : "< ",
+                pkt->buf,
+                strlen(pkt->buf)
+                );
+        if (err != REDIS_OK) {
+            trace_warning("Douyu: publish to Redis failed!\n");
+        }
     }
 
     post_message(instance, pkt->buf, client);
