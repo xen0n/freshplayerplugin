@@ -95,6 +95,7 @@ douyu_init(struct event_base *base)
 typedef struct {
     PP_Instance instance;
     const char *buf;
+    int32_t len;
     bool client;
 } post_message_args;
 
@@ -106,10 +107,11 @@ do_post_message(void *userdata)
     post_message_args *args = (post_message_args *)userdata;
     PP_Instance instance = args->instance;
     const char *buf = args->buf;
+    int32_t len = args->len;
     bool client = args->client;
 
     struct PP_Var fn = client ? clientCallbackFunctionName : serverCallbackFunctionName;
-    struct PP_Var var = ppb_var_var_from_utf8_z(buf);
+    struct PP_Var var = ppb_var_var_from_utf8(buf, len);
     struct PP_Var exc;
 
     struct PP_Var window = ppb_instance_get_window_object(instance);
@@ -123,7 +125,7 @@ do_post_message(void *userdata)
 
 static
 void
-post_message(PP_Instance instance, const char *buf, bool client)
+post_message(PP_Instance instance, const char *buf, int32_t len, bool client)
 {
     post_message_args *args = (post_message_args *)malloc(sizeof(post_message_args));
     if (!args) {
@@ -133,6 +135,7 @@ post_message(PP_Instance instance, const char *buf, bool client)
 
     args->instance = instance;
     args->buf = buf;
+    args->len = len;
     args->client = client;
 
     ppb_core_call_on_browser_thread(instance, do_post_message, args);
@@ -141,10 +144,17 @@ post_message(PP_Instance instance, const char *buf, bool client)
 
 static
 void
-process_one_douyu_packet(PP_Instance instance, const char *buf)
+process_one_douyu_packet(PP_Instance instance, const char *buf, int32_t len)
 {
     DouyuPacket *pkt = (DouyuPacket *)buf;
     bool client = pkt->hdr.magic == DOUYU_CLIENT_MAGIC;
+
+    int32_t str_len = strlen(pkt->buf);
+    int32_t real_len = len > str_len ? str_len : len;
+
+    if (len < str_len) {
+        trace_warning("!!! packet may lack zero terminator! (pktlen=%d strlen=%d)\n", len, str_len);
+    }
 
     if (ctx) {
         int err = redisAsyncCommand(
@@ -155,14 +165,14 @@ process_one_douyu_packet(PP_Instance instance, const char *buf)
                 "douyu",
                 client ? "> " : "< ",
                 pkt->buf,
-                strlen(pkt->buf)
+                real_len
                 );
         if (err != REDIS_OK) {
             trace_warning("Douyu: publish to Redis failed!\n");
         }
     }
 
-    post_message(instance, pkt->buf, client);
+    post_message(instance, pkt->buf, real_len, client);
 }
 
 
@@ -191,7 +201,7 @@ maybe_process_douyu_packet(PP_Instance instance, const char *buf, int32_t len, b
         // packets have trailing excess data... meaning it can only be used for
         // framing.
         int32_t packet_len = hdr->next + 4;
-        process_one_douyu_packet(instance, ptr);
+        process_one_douyu_packet(instance, ptr, packet_len);
 
         ptr += packet_len;
         len -= packet_len;
