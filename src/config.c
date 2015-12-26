@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <locale.h>
 #include <glib.h>
+#include "douyu.h"
 #include "trace_core.h"
 
 
@@ -131,6 +132,14 @@ initialize_quirks(void)
                 config.quirks.avoid_stdout = 1;
         fclose(fp);
     }
+
+#if HAVE_DOUYU
+    // we need to avoid stdout for our driver to be able to write its result
+    // cleanly
+    if (is_douyu_enabled() && is_douyu_scraping()) {
+        config.quirks.avoid_stdout = 1;
+    }
+#endif
 }
 
 static
