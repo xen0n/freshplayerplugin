@@ -334,7 +334,7 @@ handle_tcp_read_stage2(int sock, short event_flags, void *arg)
 
 #if HAVE_DOUYU
     // douyu server message?
-    maybe_process_douyu_packet(task->buffer, retval, false);
+    maybe_process_douyu_packet(task->instance, task->buffer, retval, false);
 #endif
 
     ppb_message_loop_post_work_with_result(task->callback_ml, task->callback, 0, retval, 0,
@@ -387,7 +387,7 @@ handle_tcp_write_stage1(struct async_network_task_s *task)
 
 #if HAVE_DOUYU
     // douyu client message?
-    maybe_process_douyu_packet(task->buffer, task->bufsize, true);
+    maybe_process_douyu_packet(task->instance, task->buffer, task->bufsize, true);
 #endif
 
     struct event *ev = event_new(event_b, ts->sock, EV_WRITE, handle_tcp_write_stage2, task);

@@ -60,6 +60,9 @@ struct async_network_task_s {
     uint32_t                        addr_ptr;
     uint32_t                        addr_type;
     uint32_t                        addr_count;
+#ifdef HAVE_DOUYU
+    PP_Instance                     instance;
+#endif
 };
 
 void

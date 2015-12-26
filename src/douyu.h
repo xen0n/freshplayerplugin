@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <event2/event.h>
+#include <ppapi/c/pp_instance.h>
 
 #define DOUYU_CLIENT_MAGIC 0x2b1
 #define DOUYU_SERVER_MAGIC 0x2b2
@@ -27,6 +28,6 @@ douyu_init(struct event_base *base);
 
 
 void
-maybe_process_douyu_packet(const char *buf, int32_t len, bool client);
+maybe_process_douyu_packet(PP_Instance instance, const char *buf, int32_t len, bool client);
 
 #endif // FPP_DOUYU_H

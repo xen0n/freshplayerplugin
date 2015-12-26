@@ -232,6 +232,9 @@ ppb_tcp_socket_read(PP_Resource tcp_socket, char *buffer, int32_t bytes_to_read,
     task->bufsize = bytes_to_read;
     task->callback = callback;
     task->callback_ml = ppb_message_loop_get_current();
+#ifdef HAVE_DOUYU
+    task->instance = ts->instance->id;
+#endif
     pp_resource_release(tcp_socket);
 
     async_network_task_push(task);
@@ -270,6 +273,9 @@ ppb_tcp_socket_write(PP_Resource tcp_socket, const char *buffer, int32_t bytes_t
     task->bufsize = bytes_to_write;
     task->callback = callback;
     task->callback_ml = ppb_message_loop_get_current();
+#ifdef HAVE_DOUYU
+    task->instance = ts->instance->id;
+#endif
     pp_resource_release(tcp_socket);
 
     async_network_task_push(task);
