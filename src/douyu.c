@@ -14,7 +14,8 @@ static redisAsyncContext *ctx = NULL;
 static const char *redis_host;
 static unsigned short redis_port;
 
-struct PP_Var callbackFunctionName;
+struct PP_Var clientCallbackFunctionName;
+struct PP_Var serverCallbackFunctionName;
 
 
 void
@@ -49,7 +50,8 @@ douyu_init(struct event_base *base)
     redisLibeventAttach(ctx, base);
     trace_info("Douyu Redis side channel initialized!\n");
 
-    callbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsg");
+    clientCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgC");
+    serverCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgS");
 
     configured = true;
 }
@@ -58,6 +60,7 @@ douyu_init(struct event_base *base)
 typedef struct {
     PP_Instance instance;
     const char *buf;
+    bool client;
 } post_message_args;
 
 
@@ -68,12 +71,14 @@ do_post_message(void *userdata)
     post_message_args *args = (post_message_args *)userdata;
     PP_Instance instance = args->instance;
     const char *buf = args->buf;
+    bool client = args->client;
 
+    struct PP_Var fn = client ? clientCallbackFunctionName : serverCallbackFunctionName;
     struct PP_Var var = ppb_var_var_from_utf8_z(buf);
     struct PP_Var exc;
 
     struct PP_Var window = ppb_instance_get_window_object(instance);
-    ppb_var_call(window, callbackFunctionName, 1, &var, &exc);
+    ppb_var_call(window, fn, 1, &var, &exc);
     ppb_var_release(var);
     ppb_var_release(exc);
     ppb_var_release(window);
@@ -83,7 +88,7 @@ do_post_message(void *userdata)
 
 static
 void
-post_message(PP_Instance instance, const char *buf)
+post_message(PP_Instance instance, const char *buf, bool client)
 {
     post_message_args *args = (post_message_args *)malloc(sizeof(post_message_args));
     if (!args) {
@@ -93,6 +98,7 @@ post_message(PP_Instance instance, const char *buf)
 
     args->instance = instance;
     args->buf = buf;
+    args->client = client;
 
     ppb_core_call_on_browser_thread(instance, do_post_message, args);
 }
@@ -103,6 +109,7 @@ void
 process_one_douyu_packet(PP_Instance instance, const char *buf)
 {
     DouyuPacket *pkt = (DouyuPacket *)buf;
+    bool client = pkt->hdr.magic == DOUYU_CLIENT_MAGIC;
 
     int err = redisAsyncCommand(
             ctx,
@@ -110,7 +117,7 @@ process_one_douyu_packet(PP_Instance instance, const char *buf)
             NULL,
             "PUBLISH %s %s%b",
             "douyu",
-            pkt->hdr.magic == DOUYU_CLIENT_MAGIC ? "> " : "< ",
+            client ? "> " : "< ",
             pkt->buf,
             strlen(pkt->buf)
             );
@@ -118,7 +125,7 @@ process_one_douyu_packet(PP_Instance instance, const char *buf)
         trace_warning("Douyu: publish to Redis failed!\n");
     }
 
-    post_message(instance, pkt->buf);
+    post_message(instance, pkt->buf, client);
 }
 
 
