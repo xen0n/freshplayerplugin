@@ -55,8 +55,6 @@ is_douyu_scraping(void)
 void
 douyu_init(struct event_base *base)
 {
-    const char *tmp;
-
     if (!is_douyu_enabled()) {
         trace_info("Douyu side channel disabled");
         return;
@@ -74,7 +72,7 @@ douyu_init(struct event_base *base)
         return;
     }
 
-    tmp = getenv("DOUYU_SIDE_CHANNEL_REDIS_PORT");
+    const char *tmp = getenv("DOUYU_SIDE_CHANNEL_REDIS_PORT");
     if (tmp) {
         redis_port = (unsigned short) atoi(tmp);
         if (!redis_port) {
