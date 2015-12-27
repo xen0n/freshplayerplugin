@@ -105,7 +105,7 @@ else()
     add_definitions(-DHAVE_HWDEC=0)
 endif()
 
-if (HIREDIS_FOUND AND WITH_DOUYU)
+if (WITH_DOUYU)
     list(APPEND source_list douyu.c)
 endif()
 
