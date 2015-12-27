@@ -1,18 +1,22 @@
 #include "douyu.h"
 #include <stdlib.h>
 #include <string.h>
+#if HAVE_DOUYU_REDIS
 #include <hiredis/hiredis.h>
 #include <hiredis/async.h>
 #include <hiredis/adapters/libevent.h>
+#endif
 #include "ppb_core.h"
 #include "ppb_instance.h"
 #include "ppb_var.h"
 #include "trace.h"
 
 static bool configured = false;
+#if HAVE_DOUYU_REDIS
 static redisAsyncContext *ctx = NULL;
 static const char *redis_host;
 static unsigned short redis_port;
+#endif
 
 struct PP_Var clientCallbackFunctionName;
 struct PP_Var serverCallbackFunctionName;
@@ -62,6 +66,7 @@ douyu_init(struct event_base *base)
     serverCallbackFunctionName = ppb_var_var_from_utf8_z("onDouyuSideChannelMsgS");
     configured = true;
 
+#if HAVE_DOUYU_REDIS
     // redis side channel
     redis_host = getenv("DOUYU_SIDE_CHANNEL_REDIS_HOST");
     if (!redis_host) {
@@ -89,6 +94,7 @@ douyu_init(struct event_base *base)
 
     redisLibeventAttach(ctx, base);
     trace_info("Douyu Redis side channel initialized!\n");
+#endif
 }
 
 
@@ -156,6 +162,7 @@ process_one_douyu_packet(PP_Instance instance, const char *buf, int32_t len)
         trace_warning("!!! packet may lack zero terminator! (pktlen=%d strlen=%d)\n", len, str_len);
     }
 
+#if HAVE_DOUYU_REDIS
     if (ctx) {
         int err = redisAsyncCommand(
                 ctx,
@@ -171,6 +178,7 @@ process_one_douyu_packet(PP_Instance instance, const char *buf, int32_t len)
             trace_warning("Douyu: publish to Redis failed!\n");
         }
     }
+#endif
 
     post_message(instance, pkt->buf, real_len, client);
 }

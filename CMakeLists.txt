@@ -147,14 +147,21 @@ endif()
 
 # douyu side channeling support
 set (WITH_DOUYU TRUE CACHE STRING "build with douyutv.com side channel")
+set (WITH_DOUYU_REDIS FALSE CACHE STRING "build douyu side channel with redis")
 if (WITH_DOUYU)
     add_definitions(-DHAVE_DOUYU=1)
+else()
+    add_definitions(-DHAVE_DOUYU=0)
+endif()
+
+if (WITH_DOUYU_REDIS)
+    add_definitions(-DHAVE_DOUYU_REDIS=1)
     pkg_check_modules(HIREDIS hiredis REQUIRED)
     list(APPEND REQ_LIBRARY_DIRS ${HIREDIS_LIBRARY_DIRS})
     list(APPEND REQ_INCLUDE_DIRS ${HIREDIS_INCLUDE_DIRS})
     list(APPEND REQ_LIBRARIES    ${HIREDIS_LIBRARIES})
 else()
-    add_definitions(-DHAVE_DOUYU=0)
+    add_definitions(-DHAVE_DOUYU_REDIS=0)
 endif()
 
 include_directories(${REQ_INCLUDE_DIRS})
